@@ -1,0 +1,335 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+	<head>
+		<title>mootools 实例 / 图片标注</title>
+		<meta http-equiv="Content-Type" content="text/html; charset=utf8" />
+		<meta name="author" content="Liuyang@gmail.com" />
+		<meta name="keywords" content="" />
+		<meta name="description" content="" />
+		<!-- compliance patch for microsoft browsers -->
+		<!--[if lt IE 8]><script type="text/javascript" src="static/ie8.js"></script></script><![endif]-->
+		<style type="text/css">
+			address,caption,cite,code,dfn,em,strong,th,var { font-style:normal; font-weight:normal}
+			div,dl,dt,dd,ul,ol,li,h1,h2,h3,h4,h5,h6,pre,form,fieldset,input,textarea,p,blockquote,th,td { margin:0; padding:0}
+			caption,th { text-align:left}
+			fieldset,img, abbr,acronym { border:0}
+			h1,h2,h3,h4,h5,h6 { font-size:100%; font-weight:normal}
+			ol,ul { list-style:none}
+			q:before,q:after { content:''}
+			table { border-collapse:collapse; border-spacing:0}
+
+			body{font-size:12px;font-weight:normal;font-family:georgia;margin-top:30px}
+			#photo {margin:0 auto;background:#efefef;width:500px;position:relative}
+			#photo #tags {position:absolute;z-index:1000}
+			#photo #img {position:absolute;z-index:99}
+			#tags .tag {position:absolute}
+			.tagFrame {border:1px solid #fff;display:block;cursor:pointer;background:url(static/shim.gif)}
+			.tagFrame_b {border:1px solid #000;display:block}
+			.tagFrame_w {border:1px solid #fff;display:block}
+			#tagTemplate {position:absolute;background:url(static/shim.gif);z-index:9999}
+			#tagDashed {cursor:move;background:url(static/shim.gif)}
+			.dotted {border:1px dashed}
+			.tagCt {border:1px solid #000;background:#fff;height:4px;cursor:se-resize;width:4px;position:absolute;overflow:hidden}
+			.tagNote {display:block;width:220px;}
+			#photo {border:0px solid #ffff00}
+
+			.tips {padding:0;text-align:left;margin:5px 0 0 0}
+			.tips .tle {background:url(static/note-l-t-trans.png);width:7px;height:8px;}
+			.tips .tce {background:url(static/note-c-t-trans.png);height:8px;}
+			.tips .tri {background:url(static/note-r-t-trans.png);width:14px;height:8px;}
+			.tips .mle {background:url(static/note-l-m-trans.png);width:7px;}
+			.tips .mce {background:#000000;color:#565656;padding:5px;}
+			.tips .mce .ct {color:#ff6600;margin-bottom:5px;}
+			.tips .mri {background:url(static/note-r-m-trans.png);width:14px;}
+			.tips .ble {background:url(static/note-b-l-trans.png);width:7px;height:14px;}
+			.tips .bce {background:url(static/note-b-c-trans.png);height:14px;}
+			.tips .bri {background:url(static/note-b-r-trans.png);width:14px;height:14px;}
+			.tips .s {border:1px solid #565656;background:#cccccc;}
+			input.s {border:1px solid #cccccc;background:black;padding:4px;font-size:12px;font-family:tahoma}
+			input.b {padding:2px;font-size:12px;font-weight:tahoma}
+		</style>
+		<script type="text/javascript" src="static/mo.js"></script>
+		<script type="text/javascript">
+			var imgId = 'img';
+			var tagWd = 60;
+			var tagHt = 60;
+			var allowResize = true;
+			var defaultZindex = 100;
+			var autoLoadTags = true;
+			var noteDivWidth = 210;
+			var noteDivHeight = 68;
+			window.addEvent('domready', function() {
+				var myPosition = $('myPhoto').getCoordinates();
+				var myWidth = myPosition['width'];
+				var myHeight = myPosition['height'];
+				$('photo').setStyle('width',myWidth+'px');
+				$('photo').setStyle('height',myHeight+'px');
+				$('photo').addEvent('mouseenter', function(){
+					$$('#tags div.tag').setStyle('display','block');
+				});
+				$('photo').addEvent('mouseleave', function(){
+					$$('#tags div.tag').setStyle('display','none');			
+				});
+				var tagList = $$('#tags div.tag');
+				var freshTag = function(){
+					tagList = $$('#tags div.tag');
+					tagList.each(function(element) {
+						var note = element.getElements('div.tagNote');
+						var tagFr = element.getElements('div.tagFrame');
+						var tagFr2 = element.getElements('div.tagFrame_w');
+						element.addEvent('mouseenter', function(){
+							note.setStyle('display','block');
+							tagFr.setStyle('border-color','#FFFF00');
+							tagFr2.setStyle('border-color','#FFFF00');
+						});
+						element.addEvent('mouseleave', function(){
+							note.setStyle('display','none');
+							tagFr.setStyle('border-color','#ffffff');
+							tagFr2.setStyle('border-color','#ffffff');
+						});
+						element.addEvent('click', function(){
+							var tagPosition = element.getStyles('left','top');
+							var tag_x = tagPosition['left'].toInt();					
+							var tag_y = tagPosition['top'].toInt();
+							var nextNod = element.getChildren();
+							var boxPosition = nextNod[0];
+							var boxSize = boxPosition.getStyles('width','height');
+							var box_w = boxSize['width'].toInt();
+							var box_h = boxSize['height'].toInt();
+							element.setStyle('display','none');
+							element.setProperty('class','tag_editing');
+							element.setProperty('id','tag_editing');
+							$('tagDashed').setStyles({left:tag_x,top:tag_y});
+							$('tagDashed').setStyle('width',box_w+'px');
+							$('tagDashed').setStyle('height',box_h+'px');
+							var box_w2 = box_w - 2;
+							var box_h2 = box_h - 2;
+							$('tagDashedInner').setStyle('width',box_w2+'px');
+							$('tagDashedInner').setStyle('height',box_h2+'px');
+							$('tagNote').setStyles({left:tag_x,top:tag_y + box_h});
+							var descNod = element.getElements('div[class=ct]');
+							var descText = descNod.getText();
+							$('tagContent').value = descText;
+							$('tagTemplate').setStyle('display','block');
+							var ctLeft = box_w - 6;
+							var ctTop = box_h - 6;
+							$('tagCt_br').setStyle('left',ctLeft+'px');
+							$('tagCt_br').setStyle('top',ctTop+'px');
+						});
+					});
+				};
+				if (tagList!=null){
+					freshTag();
+				}
+				$('tagCt_br').makeDraggable({
+					onStart: function() {
+					}.bind($('tagCt_br')),
+					onDrag: function() {
+						var myVar = $('photo').getPosition();
+						var leftN = myVar['x'];
+						var topN = myVar['y'];
+						var ar = getDashFramePosition();
+						var selfWd = ar['0'];
+						var selfHt = ar['1'];
+						var tt = this.getTop() - topN - selfHt + 8;
+						var ll = this.getLeft() - leftN - selfWd + 8;
+						var pointTop = this.getTop() - topN + 6 - selfHt;
+						var pointLeft = this.getLeft() -leftN + 6 - selfWd;
+						var pointTop2 = this.getTop() - topN + 4 -selfHt;
+						var pointLeft2 = this.getLeft() -leftN + 4 - selfWd;
+						$('tagDashed').setStyle('width',pointLeft+'px');
+						$('tagDashedInner').setStyle('width',pointLeft2+'px');
+						if(myHeight - tt < selfHt)
+						{
+							var endTop = myHeight - selfHt -8;
+							var endTop2 = myHeight - selfHt -2;
+							var endTop2a = myHeight - selfHt -4;
+							$('tagCt_br').setStyle('top',endTop+'px');
+							$('tagDashed').setStyle('height',endTop2+'px');
+							$('tagDashedInner').setStyle('height',endTop2a+'px');
+						}else{
+							$('tagDashed').setStyle('height',pointTop+'px');
+							$('tagDashedInner').setStyle('height',pointTop2+'px');
+						}
+						if(myWidth - ll < selfWd)
+						{
+							var endLeft = myWidth - selfWd - 8;
+							var endLeft2 = myWidth - selfWd -2;
+							var endLeft2a = myWidth - selfWd -4;
+							$('tagCt_br').setStyle('left',endLeft+'px');
+							$('tagDashed').setStyle('width',endLeft2+'px');
+							$('tagDashedInner').setStyle('width',endLeft2a+'px');
+						}else{
+							$('tagDashed').setStyle('width',pointLeft+'px');
+							$('tagDashedInner').setStyle('width',pointLeft2+'px');
+						}
+						var bb = pointTop + selfHt;
+						var tmp = topN + myHeight -this.getTop();
+						if(tmp < noteDivHeight)
+						{
+							var offSetY = selfHt - noteDivHeight;
+							var fixedOffsetY = 0;
+							if(offSetY < topN)
+							{
+								fixedOffsetY = selfHt;
+							}else{
+								fixedOffsetY = offSetY;
+							}								
+							$('tagNote').setStyle('top',fixedOffsetY+'px');
+						}else{
+							$('tagNote').setStyle('top',bb+'px');
+						}
+					}.bind($('tagCt_br')),
+					snap: 5,
+					container: 'photo'	
+				});
+				$('tagDashed').makeDraggable({
+					onStart: function() {
+					}.bind($('tagDashed')),
+					onDrag: function() {
+						var myVar = $('photo').getPosition();
+						var leftN = myVar['x'];
+						var topN = myVar['y'];
+						var ar = getDashFrameSizr();
+						var selfWd = ar['0'];
+						var selfHt = ar['1'];
+						var pointTop = this.getTop() - topN;
+						var pointLeft = this.getLeft() -leftN;
+						var bb = pointTop + selfHt;
+						if(myWidth-pointLeft < noteDivWidth)
+						{
+							var offSetX = myWidth - noteDivWidth;
+							$('tagNote').setStyle('left',offSetX+'px');
+						}else{
+							$('tagNote').setStyle('left',pointLeft+'px');
+						}
+						if(myHeight - pointTop - selfHt < noteDivHeight)
+						{
+							var offSetY = pointTop - noteDivHeight;
+							$('tagNote').setStyle('top',offSetY+'px');
+						}else{
+							$('tagNote').setStyle('top',bb+'px');
+						}
+					}.bind($('tagDashed')),
+					snap: 5,
+					container: 'photo'
+				});
+
+				$('tagSaveBtn').addEvent('click',function()
+				{
+					if($('tagContent').value == '')
+					{
+						$('tagContent').setStyle('background','#ffff00');
+					}else{
+						var newObj = $('tagClone').clone();
+						var nId = $random(1000,1999);
+						newObj.setProperty('id','tag_'+nId);
+						newObj.injectTop('tags');
+						var sizr = getDashFrameSizr();
+						var wd = sizr['0'];
+						var ht = sizr['1'];
+						var pos = getDashFramePosition();
+						var iTop = pos['1'];
+						var iLeft = pos['0'];
+						setTagSizr(nId,wd,ht);
+						newObj.setStyle('top',iTop+'px');
+						newObj.setStyle('left',iLeft+'px');
+						newObj.setStyle('display','block');
+						var noteContent = $('tagContent').value;
+						$('tagNote_content').setText(noteContent);
+						$('tagTemplate').setStyle('display','none');
+						freshTag();
+						resetDashFrame();
+					}
+				})
+			});
+
+			function startNote()
+			{
+				$('tagTemplate').setStyle('display','block');
+			}
+
+			function setTagSizr(c,a,b)
+			{
+				var w2 = a - 2;
+				var w3 = a - 4;
+				var h2 = b - 2;
+				var h3 = b - 4;
+				var f1  = $('tag_'+c).getElements('div[class=tagFrame]');
+				f1.setStyle('width',a+'px');
+				f1.setStyle('height',b+'px');
+				var f2  = $('tag_'+c).getElements('div[class=tagFrame_b]');
+				f2.setStyle('width',w2+'px');
+				f2.setStyle('height',h2+'px');
+				var f3  = $('tag_'+c).getElements('div[class=tagFrame_w]');
+				f3.setStyle('width',w3+'px');
+				f3.setStyle('height',h3+'px');
+			}
+
+			function getDashFramePosition()
+			{
+				var myVar = $('photo').getPosition();
+				var leftN_1 = myVar['x'];
+				var topN_1 = myVar['y'];
+				var myVar_2 = $('tagDashed').getPosition();
+				var leftN_2 = myVar_2['x'];
+				var topN_2 = myVar_2['y'];
+				var wd = leftN_2 - leftN_1;
+				var ht = topN_2 - topN_1;
+				var ar = [wd,ht]
+				return ar;
+			}
+
+			function getDashFrameSizr()
+			{
+				var ar = $('tagDashed').getCoordinates();
+				var ht = ar['height'] - 2;
+				var wd = ar['width'] - 2 ;
+				var arr = [wd,ht];
+				return arr;
+			}
+
+			function resetDashFrame()
+			{
+				$('tagDashed').setStyle('left','40px');
+				$('tagDashed').setStyle('top','40px');
+				$('tagDashed').setStyle('width','60px');
+				$('tagDashed').setStyle('height','60px');
+				$('tagDashedInner').setStyle('width','58px');
+				$('tagDashedInner').setStyle('height','58px');
+				$('tagNote').setStyle('left','40px');
+				$('tagNote').setStyle('top','100px');
+				$('tagContent').value = '';
+				$('tagCt_br').setStyle('left','54px');
+				$('tagCt_br').setStyle('top','54px');
+			}
+		</script>
+	</head>
+	<body>
+		<div id="photo">
+			<div id="tags">
+			</div>
+			<div id="tagModel" style="display:none">
+				<div id="tagClone" class="tag">
+					<div class="tagFrame"><div class="tagFrame_b"><div class="tagFrame_w"></div></div></div>
+					<div class="tagNote" style="display:none">
+						<table class="tips"><tr><td class="tle"></td><td class="tce"></td><td class="tri"><img src="static/shim.gif" width="14" height="1"></td></tr><tr><td class="mle"><img src="static/shim.gif" width="7" height="1"></td><td class="mce"><div class="ct" id="tagNote_content"></div></td><td class="mri"><img src="static/shim.gif" width="14" height="1"></td></tr><tr><td class="ble"></td><td class="bce"></td><td class="bri"></td></tr></table>
+					</div>
+				</div>
+			</div>
+			<div id="tagTemplate" style="display:none">
+				<div id="tagDashed" class="tagFrame_b dotted" style="border:1px dashed #000;width:60px;height:60px;top:40px;left:40px">
+					<div id="tagDashedInner" class="tagFrame_b dotted" style="border:1px dashed #fff;width:58px;height:58px;position:relative">
+						<div id="tagCt_br" class="tagCt" style="top:54px;left:54px"></div>
+					</div>
+				</div>
+				<div class="tagNote" id="tagNote" style="position:absolute;top:100px;left:40px">
+					<table class="tips"><tr><td class="tle"></td><td class="tce"></td><td class="tri"><img src="static/shim.gif" width="14" height="1"></td></tr><tr><td class="mle"><img src="static/shim.gif" width="7" height="1"></td><td class="mce"><div class="ct"><input id="tagContent" name="tagContent" style="width:150px" class="s"><input type="button" value="OK" class="b" id="tagSaveBtn"></div></td><td class="mri"><img src="static/shim.gif" width="14" height="1"></td></tr><tr><td class="ble"></td><td class="bce"></td><td class="bri"></td></tr></table>
+				</div>
+			</div>
+			<div id="img"><img src="static/twitter2.jpg" width="500" height="375" border="0" alt="" title="" id="myPhoto"></div>
+		</div>
+		<p>&nbsp;</p>
+		<div align="center"><a href="javascript:startNote()" title="">给照片添加标注</a></div>
+	</body>
+</html>
